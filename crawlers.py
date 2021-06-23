@@ -21,7 +21,7 @@ con = psycopg2.connect(database="Crawler", user="postgres"
 
 class Crawler:
     global s,n,counts,check_domain
-    s = 1967
+    s = 5934
     n = 0
     counts=[]
     check_domain=[]
@@ -29,7 +29,87 @@ class Crawler:
         self.visited_urls = []
         self.test=[]
         self.urls_to_visit = urls
-      
+    def download_url(self, url):
+        p = 0
+        t = requests.get(url).text
+        input_tag=None
+        global s,n,strcount,select
+        r = requests.get(url)
+        response = requests.get(url, stream=True)
+        file_date = response.headers.get("date")
+        file_size = sys.getsizeof(t)
+        domain = urlparse(url).netloc
+        domain_name = '.'.join(domain.split('.')[1:])
+        Form(urls=[url]).run()
+        print("run")
+        #open("page.html", "w",encoding="utf-8").write(str(soup))
+        #webbrowser.open("page.html")    
+        html_bytes = r.text
+        soup2 = bs4(html_bytes, 'html.parser')
+        token = soup2.find('div').get_text().strip()
+        strcount = str(s)
+        cur = con.cursor()
+        #cur.execute("INSERT INTO data_url(id,url) VALUES (%s,%s)",(strcount,url))
+        #cur.execute("INSERT INTO data_html(id,html_data,date,size) VALUES (%s,%s,%s,%s)",(strcount,token,file_date,file_size))
+        print(f'Crawling so : {s}\n')
+        con.commit()
+        return t
+    
+    def get_linked_urls(self, url, html):
+        global strcount
+        soup = bs4(html, 'html.parser')
+        linked_url = []
+        cur = con.cursor()
+        for link in soup.find_all('a'):
+            path = link.get('href')
+            linked_url.append(path)
+            if path and path.startswith('/'):
+                path = urljoin(url, path)
+            yield path
+        #cur.execute("INSERT INTO url_linked(id,url,linked) VALUES (%s,%s,%s)",(strcount,url,linked_url))
+    def add_url_to_visit(self, url):#add url after check url in array
+        if url not in self.visited_urls and url not in self.urls_to_visit:
+            self.urls_to_visit.append(url)
+
+    def crawl(self, url):
+        html = self.download_url(url)
+        for url in self.get_linked_urls(url, html):
+            self.add_url_to_visit(url)
+    
+    def run(self):
+        global s,g,select
+        while self.urls_to_visit:
+            finish = time.perf_counter()
+            finish_time = int(finish-start)
+            if finish_time>=timer:
+                print(f'Crawling all : {s}')
+                print(f'finished in {round(finish-start, 2)} second(s)')
+                break
+            url = self.urls_to_visit.pop(0)
+            logging.info(f'Crawling: {url}')
+            try:
+                robots = urljoin(url,"robots.txt")
+                html_robots = requests.get(robots).text
+                soup2 = bs4(html_robots, 'html.parser').text
+                s_dis = soup2.find("Disallow: ")+10
+                posi_dis = soup2[s_dis:s_dis+10]
+            except:
+                pass
+            try:
+                self.crawl(url)
+                time.sleep(3)
+            except Exception:
+                logging.exception(f'Failed to crawl: {url}')
+            finally:
+                self.visited_urls.append(url)
+                s =s+1
+        print("finish")
+        con.close()
+class Form:
+    def __init__(self, urls=[]):
+        self.visited_urls = []
+        self.test=[]
+        self.urls_to_visit = urls
     def get_all_forms(self,url):#########
         res = session.get(url)
         soup = bs4(res.html.html, "html.parser")
@@ -49,18 +129,10 @@ class Crawler:
         details["method"] = method
         details["inputs"] = inputs
         return details
-    def download_url(self, url):
-        p = 0
-        t = requests.get(url).text
-        input_tag=None
-        global s,n,strcount
-        r = requests.get(url)
-        response = requests.get(url, stream=True)
-        file_date = response.headers.get("date")
-        file_size = sys.getsizeof(t)
-        domain = urlparse(url).netloc
-        domain_name = '.'.join(domain.split('.')[1:])
+    def run(self):
+        url = self.urls_to_visit.pop(0)
         forms = self.get_all_forms(url)
+        print(forms)
         for i, form in enumerate(forms, start=1):
             form_details = self.get_form_details(form)
             print("="*50, f"form #{i}", "="*50)
@@ -69,7 +141,7 @@ class Crawler:
         try:
             for input_tag in form_details["inputs"]:
                 if input_tag["type"] == "hidden":
-                    data[input_tag["name"]] = input_tag["value"]
+                      data[input_tag["name"]] = input_tag["value"]
                 elif input_tag["type"] != "submit":
                     with open('test.txt','r',encoding='utf8') as file: 
                         for line in file:
@@ -103,79 +175,18 @@ class Crawler:
                         n = 0
                     n =n+1
 
-        ########################################
+            ########################################
             url = urljoin(url, form_details["action"])
             if form_details["method"] == "post":
                 res = session.post(url, data=data)
             elif form_details["method"] == "get":
                 res = session.get(url, params=data)
                 soup = bs4(res.content, "html.parser")
-        ########################################   Submit auto
         except:
             pass
-            #print("error")
-        #open("page.html", "w",encoding="utf-8").write(str(soup))
-        #webbrowser.open("page.html")    
-        html_bytes = r.text
-        soup2 = bs4(html_bytes, 'html.parser')
-        token = soup2.find('div').get_text().strip()
-        strcount = str(s)
-        cur = con.cursor()
-        #cur.execute("INSERT INTO data_url(id,url) VALUES (%s,%s)",(strcount,url))
-        #cur.execute("INSERT INTO data_html(id,html_data,date,size) VALUES (%s,%s,%s,%s)",(strcount,token,file_date,file_size))
-        
-        print(f'Crawling so : {s}\n')
-        con.commit()
-        return t
-
-    def get_linked_urls(self, url, html):
-        global strcount
-        soup = bs4(html, 'html.parser')
-        linked_url = []
-        cur = con.cursor()
-        for link in soup.find_all('a'):
-            path = link.get('href')
-            linked_url.append(path)
-            if path and path.startswith('/'):
-                path = urljoin(url, path)
-            yield path
-        cur.execute("INSERT INTO url_linked(id,url,linked) VALUES (%s,%s,%s)",(strcount,url,linked_url))
-    def add_url_to_visit(self, url):#add url after check url in array
-        if url not in self.visited_urls and url not in self.urls_to_visit:
-            self.urls_to_visit.append(url)
-
-    def crawl(self, url):
-        html = self.download_url(url)
-        for url in self.get_linked_urls(url, html):
-            self.add_url_to_visit(url)
-    
-    def run(self):
-        global s,g
-        #robots = urljoin(url,"robots.txt")
-        #html_robots = requests.get(robots).text
-        #soup2 = bs4(html_robots, 'html.parser').text
-        #s_dis = soup2.find("Disallow: ")+10
-        #posi_dis = soup2[s_dis:s_dis+10]
-        while self.urls_to_visit:
-            finish = time.perf_counter()
-            finish_time = int(finish-start)
-            if finish_time>=timer:
-                print(f'Crawling all : {s}')
-                print(f'finished in {round(finish-start, 2)} second(s)')
-                break
-            url = self.urls_to_visit.pop(0)
-            logging.info(f'Crawling: {url}')
-            try:
-                self.crawl(url)
-                time.sleep(3)
-            except Exception:
-                logging.exception(f'Failed to crawl: {url}')
-            finally:
-                self.visited_urls.append(url)
-                s =s+1
-        print("finish")
-        con.close()
-    
+class addDatabase:
+    def __init__(self):
+        self.name = name
 if __name__ == '__main__':
     a=input('Enter URL:')
     timer = int(input('Time : '))*3600
