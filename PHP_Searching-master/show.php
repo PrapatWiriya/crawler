@@ -7,7 +7,6 @@
                         <th width="10%">date</th>
                         <th width="50%">detail</th>
                         <th width="5%">url</th>
-                        <th width="50%">exam</th>
                     </tr>
                 </thead>
                 <?php
@@ -16,8 +15,7 @@
                 echo $_GET['q'];
                 echo '</font>';
                 echo '<br/>';  
-                $sg = $_GET['q'];
-                echo $sg;           
+                $sg = $_GET['q'];          
                 $sql_data = "SELECT data_html.id,html_data,data_url.id,url,date,l_html FROM data_html
                     INNER JOIN data_url ON data_html.id = data_url.id
                     WHERE html_data LIKE '%$q%' OR url LIKE '%$q%'
