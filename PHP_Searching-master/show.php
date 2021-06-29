@@ -31,12 +31,11 @@
                     <?php $get_url = $row['url'];?>
                     <?php $get_id = $row['id'];?>
                 <tr>
-                    <td><?php echo '<a href= '.$row['url'].' target="_blank"> '. $row['date']. '</a>';?></td>
-                    <td><?php echo  "<a href=showhtml.php?Name=$get_url&Ma=$get_id>Product Details</a>";?>
+                    <td><?php echo "<a href=showhtml.php?Name=$get_url&Ma=$get_id>". $row['date']. '</a>';?></td>
+                    <!--<td><#?php echo  "<a href=showhtml.php?Name=$get_url&Ma=$get_id>Product Details</a>";?-->
                     <td><?php echo $row['html_data'];?></td>
                     <td><?php echo $row['url'];?></td>
-                    <!--<td>!--?php echo $row['l_html'];?></td>-->
-                    <!--td><iframe srcdoc="<a href= '.$row['url']."height="400" width="500"frameborder="0"scrolling="auto"align="right"></a></iframe></td-->
+                    
                 </tr>
             <?php } ?>
             </table>
