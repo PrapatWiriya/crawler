@@ -15,58 +15,45 @@ session = HTMLSession()
 logging.basicConfig(
     format='%(asctime)s %(levelname)s:%(message)s',#date time
     level=logging.INFO)
-con = psycopg2.connect(database="Crawler", user="postgres"
-                       , password="Ppt6030300571@"
-                       , host="127.0.0.1", port="5432")
-
 class Crawler:
-    global s,n,counts,check_domain
-    s = 5934
+    global c_id,n,counts,check_domain
+    c_id = 11006
     n = 0
     counts=[]
     check_domain=[]
     def __init__(self, urls=[]):
         self.visited_urls = []
-        self.test=[]
         self.urls_to_visit = urls
     def download_url(self, url):
         p = 0
+        d = addDatabase()
         t = requests.get(url).text
-        input_tag=None
-        global s,n,strcount,select
+        global c_id,n,strcount
         r = requests.get(url)
+        strcount = str(c_id)
         response = requests.get(url, stream=True)
         file_date = response.headers.get("date")
         file_size = sys.getsizeof(t)
-        domain = urlparse(url).netloc
-        domain_name = '.'.join(domain.split('.')[1:])
-        Form(urls=[url]).run()
-        print("run")
-        #open("page.html", "w",encoding="utf-8").write(str(soup))
-        #webbrowser.open("page.html")    
+        url = Form(urls=[url]).run(strcount=strcount)  
         html_bytes = r.text
         soup2 = bs4(html_bytes, 'html.parser')
+        L_html=str(soup2)
         token = soup2.find('div').get_text().strip()
-        strcount = str(s)
-        cur = con.cursor()
-        #cur.execute("INSERT INTO data_url(id,url) VALUES (%s,%s)",(strcount,url))
-        #cur.execute("INSERT INTO data_html(id,html_data,date,size) VALUES (%s,%s,%s,%s)",(strcount,token,file_date,file_size))
-        print(f'Crawling so : {s}\n')
-        con.commit()
+        d.insert_data(strcount=strcount,url = url,token=token,file_date=file_date,file_size=file_size,L_html=L_html)
+        print(f'Crawling so : {c_id}\n')
         return t
-    
     def get_linked_urls(self, url, html):
         global strcount
         soup = bs4(html, 'html.parser')
         linked_url = []
-        cur = con.cursor()
+        p = addDatabase()
         for link in soup.find_all('a'):
             path = link.get('href')
             linked_url.append(path)
             if path and path.startswith('/'):
                 path = urljoin(url, path)
             yield path
-        #cur.execute("INSERT INTO url_linked(id,url,linked) VALUES (%s,%s,%s)",(strcount,url,linked_url))
+        p.insert_link(strcount=strcount,url = url,linked_url=linked_url)
     def add_url_to_visit(self, url):#add url after check url in array
         if url not in self.visited_urls and url not in self.urls_to_visit:
             self.urls_to_visit.append(url)
@@ -77,12 +64,12 @@ class Crawler:
             self.add_url_to_visit(url)
     
     def run(self):
-        global s,g,select
         while self.urls_to_visit:
+            global c_id
             finish = time.perf_counter()
             finish_time = int(finish-start)
             if finish_time>=timer:
-                print(f'Crawling all : {s}')
+                print(f'Crawling all : {c_id}')
                 print(f'finished in {round(finish-start, 2)} second(s)')
                 break
             url = self.urls_to_visit.pop(0)
@@ -102,13 +89,11 @@ class Crawler:
                 logging.exception(f'Failed to crawl: {url}')
             finally:
                 self.visited_urls.append(url)
-                s =s+1
+            c_id =c_id+1
         print("finish")
-        con.close()
+
 class Form:
     def __init__(self, urls=[]):
-        self.visited_urls = []
-        self.test=[]
         self.urls_to_visit = urls
     def get_all_forms(self,url):#########
         res = session.get(url)
@@ -129,14 +114,19 @@ class Form:
         details["method"] = method
         details["inputs"] = inputs
         return details
-    def run(self):
+    def run(self,strcount):
+        p = addDatabase()
         url = self.urls_to_visit.pop(0)
         forms = self.get_all_forms(url)
-        print(forms)
+        domain = urlparse(url).netloc
+        domain_name = '.'.join(domain.split('.')[1:])
+        str_form = str(forms)
+        if forms != []:
+            p.insert_form(strcount=strcount,str_form=str_form)
         for i, form in enumerate(forms, start=1):
             form_details = self.get_form_details(form)
-            print("="*50, f"form #{i}", "="*50)
-            print(form_details)
+            #print("="*50, f"form #{i}", "="*50)
+            #print(form_details)
         data = {}
         try:
             for input_tag in form_details["inputs"]:
@@ -182,13 +172,39 @@ class Form:
             elif form_details["method"] == "get":
                 res = session.get(url, params=data)
                 soup = bs4(res.content, "html.parser")
+            #open("page.html", "w",encoding="utf-8").write(str(soup))
+            #webbrowser.open("page.html") 
         except:
             pass
+        return url
 class addDatabase:
-    def __init__(self):
-        self.name = name
+    def insert_data(self,strcount,url,token,file_date,file_size,L_html):
+        con = psycopg2.connect(database="Crawler", user="postgres"
+                       , password="Ppt6030300571@"
+                       , host="127.0.0.1", port="5432")
+        cur = con.cursor()
+        cur.execute("INSERT INTO data_url(id,url) VALUES (%s,%s)",(strcount,url))
+        cur.execute("INSERT INTO data_html(id,html_data,date,size,l_html) VALUES (%s,%s,%s,%s,%s)",(strcount,token,file_date,file_size,L_html))
+        con.commit()
+        con.close()
+    def insert_link(self,strcount,url,linked_url):
+        con = psycopg2.connect(database="Crawler", user="postgres"
+                       , password="Ppt6030300571@"
+                       , host="127.0.0.1", port="5432")
+        cur = con.cursor()
+        cur.execute("INSERT INTO url_linked(id,url,linked) VALUES (%s,%s,%s)",(strcount,url,linked_url))
+        con.commit()
+        con.close()
+    def insert_form(self,strcount,str_form):
+        con = psycopg2.connect(database="Crawler", user="postgres"
+                       , password="Ppt6030300571@"
+                       , host="127.0.0.1", port="5432")
+        cur = con.cursor()
+        cur.execute("INSERT INTO data_form(id,form_data) VALUES (%s,%s)",(strcount,str_form))
+        con.commit()
+        con.close()
 if __name__ == '__main__':
-    a=input('Enter URL:')
+    get_input=input('Enter URL:')
     timer = int(input('Time : '))*3600
     start = time.perf_counter()
-    Crawler(urls=[a]).run()
+    Crawler(urls=[get_input]).run()
